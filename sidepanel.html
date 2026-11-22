@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Etix Support Assistant</title>
+    <link rel="stylesheet" href="sidepanel.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Etix Assistant</h1>
+      <div class="header-actions">
+        <span id="connectionIndicator" class="connection-indicator connection-disconnected" role="status" title="Checking the active tab…">
+          <span id="connectionSymbol" aria-hidden="true">✕</span>
+          <span id="connectionStatusText" class="visually-hidden">Checking the active tab…</span>
+        </span>
+        <button id="settingsButton" class="icon-button" type="button" aria-label="Open settings" title="Settings">⚙</button>
+      </div>
+    </header>
+
+    <main>
+      <p id="noWorkflowsMessage" class="banner banner-neutral" hidden>All workflows are disabled. Enable a workflow in Settings to get started.</p>
+
+      <section id="emailWorkflowSection" class="card command-card" hidden>
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">WORKFLOW</p>
+            <h2>Send confirmation email</h2>
+          </div>
+          <span id="emailLiveBadge" class="badge badge-safe">Preview only</span>
+        </div>
+
+        <form id="emailForm">
+          <label for="emailOrderNumber">Order number or email address</label>
+          <input id="emailOrderNumber" name="emailOrderNumber" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 12345678 or customer@example.com" required>
+
+          <div class="button-row">
+            <button id="emailPreviewButton" class="button button-primary" type="submit">Find and preview email</button>
+            <button id="emailSendButton" class="button button-danger" type="button" disabled>Send confirmation</button>
+          </div>
+        </form>
+
+        <p id="emailLiveHelp" class="help-text">
+          Sending is disabled in settings. Etix sends immediately when Resend Email is clicked.
+        </p>
+      </section>
+
+      <section id="carerWorkflowSection" class="card command-card" hidden>
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">WORKFLOW</p>
+            <h2>Issue carer discount</h2>
+          </div>
+          <span id="liveBadge" class="badge badge-safe">Preview only</span>
+        </div>
+
+        <form id="commandForm">
+          <label for="orderNumber">Order number</label>
+          <input id="orderNumber" name="orderNumber" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 12345678" required>
+
+          <label for="quantity">Number of tickets to discount</label>
+          <input id="quantity" name="quantity" type="number" min="1" max="10" step="1" value="1" required>
+
+          <div class="button-row">
+            <button id="previewButton" class="button button-primary" type="submit">Find and preview order</button>
+            <button id="applyButton" class="button button-danger" type="button" disabled>Apply discount</button>
+          </div>
+        </form>
+
+        <p id="liveHelp" class="help-text">
+          Live submission stays locked until a reviewed Etix workflow profile is installed.
+        </p>
+      </section>
+
+      <section id="parkingWorkflowSection" class="card command-card" hidden>
+        <div class="card-heading">
+          <div><p class="eyebrow">WORKFLOW</p><h2>Add Parking</h2></div>
+          <span id="parkingLiveBadge" class="badge badge-safe">Preview only</span>
+        </div>
+        <form id="parkingForm">
+          <div class="parking-layout">
+            <div>
+              <label for="parkingOrderNumber">Booking number</label>
+              <input id="parkingOrderNumber" type="text" autocomplete="off" spellcheck="false" required>
+              <label for="parkingQuantity">Parking</label>
+              <input id="parkingQuantity" data-parking-quantity="parking" type="number" min="0" max="10" step="1" value="0" required>
+              <label for="disabledParkingQuantity">Disabled Parking</label>
+              <input id="disabledParkingQuantity" data-parking-quantity="disabled" type="number" min="0" max="10" step="1" value="0" required>
+              <label for="compParkingQuantity">Parking Comp</label>
+              <input id="compParkingQuantity" data-parking-quantity="comp" type="number" min="0" max="10" step="1" value="0" required>
+            </div>
+            <div id="parkingRegistrations" class="parking-registrations" aria-live="polite"></div>
+          </div>
+          <label class="parking-email-option" for="parkingSendConfirmation">
+            <input id="parkingSendConfirmation" type="checkbox">
+            <span>Send confirmation when completed</span>
+          </label>
+          <p id="parkingEmailHelp" class="help-text"></p>
+          <div class="button-row">
+            <button id="parkingPreviewButton" class="button button-primary" type="button">Find and preview parking</button>
+            <button id="parkingPurchaseButton" class="button button-danger" type="submit" disabled>Add Parking</button>
+          </div>
+        </form>
+        <p id="parkingLiveHelp" class="help-text"></p>
+      </section>
+
+      <section id="resultCard" class="card result-card hidden" aria-live="polite">
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">LATEST RESULT</p>
+            <h2 id="resultTitle">Result</h2>
+          </div>
+          <span id="resultBadge" class="badge">—</span>
+        </div>
+        <p id="resultMessage"></p>
+        <dl id="resultDetails" class="details"></dl>
+      </section>
+
+      <section id="inspectorSection" class="card inspector-card" hidden>
+        <div>
+          <p class="eyebrow">CALIBRATION</p>
+          <h2>Inspect Etix page</h2>
+          <p>Download a redacted map of page controls so this workflow can be calibrated safely.</p>
+        </div>
+        <button id="inspectButton" class="button button-secondary" type="button">Inspect and download</button>
+        <p id="inspectionStatus" class="help-text" aria-live="polite"></p>
+      </section>
+
+      <section id="feedbackSection" class="card" hidden>
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">FEEDBACK</p>
+            <h2>What should change?</h2>
+          </div>
+        </div>
+        <label for="feedbackText">Your feedback</label>
+        <textarea id="feedbackText" rows="3" maxlength="2000" placeholder="For example: this ticket is called Essential Companion on this event."></textarea>
+        <button id="feedbackButton" class="button button-secondary" type="button">Save feedback</button>
+        <p id="feedbackStatus" class="help-text" aria-live="polite"></p>
+      </section>
+
+      <details class="activity-drawer">
+        <summary class="activity-summary"><h2>Recent activity</h2></summary>
+        <div class="activity-content">
+          <div class="activity-actions">
+            <button id="refreshButton" class="text-button" type="button">Refresh</button>
+          </div>
+          <ol id="historyList" class="history-list"></ol>
+        </div>
+      </details>
+    </main>
+
+    <dialog id="emailSuccessDialog" class="success-dialog">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">READY TO REPLY</p>
+          <h2>Confirmation email sent</h2>
+        </div>
+        <button id="emailDialogClose" class="icon-button dialog-close" type="button" aria-label="Close">×</button>
+      </div>
+      <textarea id="emailReplyText" rows="12" readonly></textarea>
+      <button id="copyEmailReplyButton" class="button button-primary" type="button">Copy reply</button>
+      <p id="copyEmailReplyStatus" class="help-text" aria-live="polite"></p>
+    </dialog>
+
+    <script src="shared.js"></script>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

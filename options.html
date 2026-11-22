@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Etix Support Assistant settings</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main class="page-shell">
+      <header>
+        <p class="eyebrow">ETIX SUPPORT ASSISTANT</p>
+        <h1>Extension settings</h1>
+        <p class="lede">Configure the local operator identity, ticket aliases, and reviewed workflow profile.</p>
+      </header>
+
+      <form id="settingsForm">
+        <section class="card">
+          <p class="eyebrow">LOCAL IDENTITY</p>
+          <h2>Operator details</h2>
+          <p>These labels are written to recent activity. They are not Etix credentials.</p>
+
+          <label for="operatorName">Operator name</label>
+          <input id="operatorName" type="text" maxlength="120" autocomplete="name">
+
+          <label for="accountLabel">Etix account label</label>
+          <input id="accountLabel" type="text" maxlength="120" placeholder="e.g. London Box Office">
+        </section>
+
+        <section class="card">
+          <p class="eyebrow">WORKFLOWS</p>
+          <h2>Enabled workflows</h2>
+          <p>Disabled workflows are hidden from the side panel and cannot start. A workflow already running is allowed to finish. Live actions still require their separate settings below.</p>
+          <label class="checkbox-row" for="emailWorkflowEnabled">
+            <input id="emailWorkflowEnabled" type="checkbox" checked>
+            <span><strong>Send confirmation email</strong><small>Find bookings and send confirmation emails, including after adding parking.</small></span>
+          </label>
+          <label class="checkbox-row" for="carerWorkflowEnabled">
+            <input id="carerWorkflowEnabled" type="checkbox" checked>
+            <span><strong>Issue carer discount</strong><small>Preview and apply carer ticket discounts.</small></span>
+          </label>
+          <label class="checkbox-row" for="parkingWorkflowEnabled">
+            <input id="parkingWorkflowEnabled" type="checkbox" checked>
+            <span><strong>Add Parking</strong><small>Preview and purchase parking for a booking.</small></span>
+          </label>
+        </section>
+
+        <section class="card">
+          <p class="eyebrow">SIDE PANEL</p>
+          <h2>Optional tools</h2>
+          <label class="checkbox-row" for="showPageInspector">
+            <input id="showPageInspector" type="checkbox">
+            <span>
+              <strong>Show Inspect Etix page</strong>
+              <small>Display the page inspection tool in the side panel.</small>
+            </span>
+          </label>
+          <label class="checkbox-row" for="showFeedback">
+            <input id="showFeedback" type="checkbox">
+            <span>
+              <strong>Show feedback in the side panel</strong>
+              <small>You can always add feedback here in Settings.</small>
+            </span>
+          </label>
+        </section>
+
+        <section class="card" aria-labelledby="enhancementsHeading">
+          <h2 id="enhancementsHeading">Etix Enhancements</h2>
+          <p>Choose which enhancements to use in Etix. Each can be turned on or off separately.</p>
+          <div id="enhancementOptions"></div>
+          <div id="colourBlindOptions" class="enhancement-details" hidden>
+            <label for="colourBlindMode">Colour-vision profile</label>
+            <select id="colourBlindMode" aria-describedby="colourBlindHelp"></select>
+            <p id="colourBlindHelp">Tritanopia uses red/cyan distinctions with patterns and contrast. Seating swatches and map hovers show matching colour-group codes, so you can compare groups without relying on colour. Save settings to apply across open Etix pages.</p>
+          </div>
+          <p id="enhancementsEmpty" class="enhancements-empty">No enhancements available yet. New enhancements will appear here with their own on/off switch.</p>
+        </section>
+
+        <section class="card">
+          <p class="eyebrow">MATCHING RULES</p>
+          <h2>Carer ticket aliases</h2>
+          <p>Enter one approved ticket-name phrase per line. Matching is conservative and stops when two candidates are similarly likely.</p>
+          <textarea id="ticketAliases" rows="8" spellcheck="false"></textarea>
+        </section>
+
+        <section class="card card-warning">
+          <p class="eyebrow">LIVE ACTIONS</p>
+          <h2>Calibrated workflow profile</h2>
+          <p>
+            The supplied profile maps a standard adult ticket to its 50%-off price code, adds the required note,
+            checks the original-payment refund, and verifies the final ticket count. Do not add passwords, cookies,
+            customer details, or page HTML.
+          </p>
+          <textarea id="workflowProfile" rows="18" spellcheck="false" placeholder="Paste a reviewed workflow profile JSON object"></textarea>
+          <button id="sampleButton" class="button button-secondary" type="button">Insert documented template</button>
+
+          <label class="checkbox-row" for="liveExecutionEnabled">
+            <input id="liveExecutionEnabled" type="checkbox">
+            <span>
+              <strong>Enable live Etix actions</strong>
+              <small>The extension may reclass tickets, decline the protection upsell, and submit the resulting refund.</small>
+            </span>
+          </label>
+
+          <label class="checkbox-row" for="skipCarerPreview">
+            <input id="skipCarerPreview" type="checkbox">
+            <span>
+              <strong>Skip carer discount preview</strong>
+              <small>When live actions are enabled, the carer form immediately runs the checked discount workflow.</small>
+            </span>
+          </label>
+
+          <label class="checkbox-row" for="emailExecutionEnabled">
+            <input id="emailExecutionEnabled" type="checkbox">
+            <span>
+              <strong>Enable confirmation email sending</strong>
+              <small>Resend Email acts immediately. Etix may not provide persistent delivery confirmation.</small>
+            </span>
+          </label>
+          <label class="checkbox-row" for="parkingExecutionEnabled">
+            <input id="parkingExecutionEnabled" type="checkbox">
+            <span>
+              <strong>Enable Add Parking purchases</strong>
+              <small>Matches the ticket venue and date, records payment as Cash, and submits the supplied registration plates.</small>
+            </span>
+          </label>
+        </section>
+
+        <div class="actions">
+          <button class="button button-primary" type="submit">Save settings</button>
+          <span id="status" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+
+      <section class="card settings-feedback">
+        <p class="eyebrow">FEEDBACK</p>
+        <h2>What should change?</h2>
+        <p>Suggestions are saved locally in this browser.</p>
+        <form id="feedbackForm">
+          <label for="feedbackText">Your feedback</label>
+          <textarea id="feedbackText" rows="4" maxlength="2000" required placeholder="Tell us what would make the assistant more useful."></textarea>
+          <button id="feedbackButton" class="button button-secondary" type="submit">Save feedback</button>
+          <p id="feedbackStatus" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+    <script src="shared.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

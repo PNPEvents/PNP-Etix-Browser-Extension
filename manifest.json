@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "Etix Support Assistant",
+  "version": "0.9.28",
+  "description": "Safely preview and run versioned Etix support workflows.",
+  "minimum_chrome_version": "114",
+  "permissions": [
+    "activeTab",
+    "sidePanel",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*.etix.com/*",
+    "https://etix.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Etix Support Assistant"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.etix.com/*",
+        "https://etix.com/*"
+      ],
+      "js": [
+        "shared.js",
+        "content-script.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.etix.com/*", "https://etix.com/*"],
+      "js": ["shared.js", "colourblind-core.js", "enhancements.js", "seat-focus.js", "order-search.js", "access-request.js"],
+      "css": ["enhancements.css"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://boxoffice.etix.com/ticket/admin/performanceAdmin/*/unassignedSeat.spa"],
+      "js": ["seat-focus-main.js", "order-search-main.js", "access-request-main.js"],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    }
+  ]
+}

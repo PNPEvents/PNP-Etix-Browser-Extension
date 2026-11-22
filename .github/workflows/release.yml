@@ -1,0 +1,196 @@
+name: Build and publish extensions
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release (for example v0.9.28)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: extension-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out the version tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Scan repository history for secrets
+        run: bash scripts/scan-secrets.sh git
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Reject private files in the Git index
+        run: npm run check:public
+
+      - name: Validate the release version
+        id: version
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const version = require('./manifest.json').version;
+          const tag = process.env.RELEASE_TAG;
+          if (!/^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/.test(tag)) {
+            throw new Error('Use a version tag such as v0.9.28.');
+          }
+          if (tag !== `v${version}` || require('./package.json').version !== version) {
+            throw new Error('Tag, manifest.json and package.json versions must match.');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+          NODE
+
+      # The project has no npm dependencies or lockfile; no install is needed.
+      - name: Run tests
+        run: npm test
+
+      - name: Validate both browser manifests and scripts
+        run: npm run check
+
+      - name: Build Chrome and Firefox packages
+        run: |
+          npm run package
+          npm run package:firefox
+
+      - name: Prepare release assets
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p release/github
+          cp "release/etix-support-assistant-${VERSION}.zip" \
+            "release/github/etix-support-assistant-${VERSION}-chrome.zip"
+          cp "release/etix-support-assistant-${VERSION}-firefox.zip" \
+            "release/github/etix-support-assistant-${VERSION}-firefox-unsigned.zip"
+
+      - name: Create or resume a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # An API/auth error must fail the job, not masquerade as a missing release.
+          if ! gh release view "$RELEASE_TAG" --json isDraft > release/existing.json 2> release/lookup-error.txt; then
+            if ! grep -qi 'release not found' release/lookup-error.txt; then
+              cat release/lookup-error.txt >&2
+              exit 1
+            fi
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "Etix Support Assistant ${RELEASE_TAG}" \
+              --notes 'Building browser packages and checking Firefox signing.'
+          elif [ "$(node -p "require('./release/existing.json').isDraft")" != true ]; then
+            echo '::error::This release is already published. Create a new version tag.'
+            exit 1
+          fi
+
+      - name: Sign Firefox for permanent installation when configured
+        id: firefox
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          signed_name="etix-support-assistant-${VERSION}-firefox.xpi"
+          # Reuse an installer saved to the draft by an earlier run. Mozilla does
+          # not accept submitting the same version twice.
+          gh release view "$RELEASE_TAG" --json assets > release/assets.json
+          if node -e 'const a = require("./release/assets.json").assets; process.exit(a.some(x => x.name === process.argv[1]) ? 0 : 1)' "$signed_name"; then
+            gh release download "$RELEASE_TAG" --pattern "$signed_name" --dir release/github
+            echo 'signed=true' >> "$GITHUB_OUTPUT"
+          elif [ -z "$WEB_EXT_API_KEY" ] && [ -z "$WEB_EXT_API_SECRET" ]; then
+            echo '::warning::Mozilla secrets are absent. Firefox ZIP supports temporary installation only.'
+            echo 'signed=false' >> "$GITHUB_OUTPUT"
+          else
+            if [ -z "$WEB_EXT_API_KEY" ] || [ -z "$WEB_EXT_API_SECRET" ]; then
+              echo '::error::Set both AMO_JWT_ISSUER and AMO_JWT_SECRET, or remove both.'
+              exit 1
+            fi
+            npx --yes --package=web-ext@10.5.0 web-ext lint \
+              --source-dir release/firefox --self-hosted --no-config-discovery
+            npx --yes --package=web-ext@10.5.0 web-ext sign \
+              --source-dir release/firefox --artifacts-dir release/signed-firefox \
+              --channel unlisted --approval-timeout 900000 \
+              --no-input --no-config-discovery
+            shopt -s nullglob
+            installers=(release/signed-firefox/*.xpi)
+            if [ "${#installers[@]}" -ne 1 ]; then
+              echo '::error::Expected exactly one Mozilla-signed Firefox XPI.'
+              exit 1
+            fi
+            cp "${installers[0]}" "release/github/$signed_name"
+            # Save immediately so a later failed upload can be retried without
+            # submitting this version to Mozilla again.
+            newly_signed=true
+            echo 'signed=true' >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f "release/github/$signed_name" ]; then
+            test "$(unzip -p "release/github/$signed_name" manifest.json | node -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => { const m=JSON.parse(s); if (m.browser_specific_settings?.gecko?.id !== "etix-support-assistant@extensions.local") process.exit(1); console.log(m.version); });')" = "$VERSION"
+            unzip -l "release/github/$signed_name" | grep -qi 'META-INF/.*\.rsa'
+            if [ "${newly_signed:-false}" = true ]; then
+              gh release upload "$RELEASE_TAG" "release/github/$signed_name"
+            fi
+          fi
+
+      - name: Add checksums and installation notes
+        env:
+          FIREFOX_SIGNED: ${{ steps.firefox.outputs.signed }}
+        run: |
+          (
+            cd release/github
+            shopt -s nullglob
+            files=(*.zip *.xpi)
+            sha256sum "${files[@]}" > SHA256SUMS.txt
+          )
+          cat > release/notes.md <<'NOTES'
+          ## Downloads
+
+          - **Chrome / Edge ZIP:** extract it, enable Developer mode at `chrome://extensions` or `edge://extensions`, select **Load unpacked**, and select the extracted folder. This download does not provide automatic updates or a Chrome Web Store installation.
+          - **Firefox unsigned ZIP:** for temporary testing using `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → the extracted `manifest.json`. Removed when Firefox restarts.
+          - **SHA256SUMS.txt:** SHA-256 checksums for the browser downloads.
+
+          Requires desktop Chrome 114+ or Firefox 142+. After updating, refresh open Etix tabs.
+          NOTES
+          if [ "$FIREFOX_SIGNED" = true ]; then
+            cat >> release/notes.md <<'NOTES'
+
+          **Firefox signed XPI:** download the `.xpi`, then open `about:addons` → the gear menu → **Install Add-on From File** and select it. Confirm installation and Etix access. This installer persists across restarts. Updates must be installed manually; no self-hosted update manifest is configured.
+          NOTES
+          else
+            printf '\n**Firefox permanent installer unavailable:** Mozilla signing credentials were not configured. Use the unsigned ZIP only for temporary testing.\n' >> release/notes.md
+          fi
+
+      - name: Upload all assets and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Only this run's explicit assets are uploaded, never historical ZIPs.
+          gh release upload "$RELEASE_TAG" release/github/* --clobber
+          gh release edit "$RELEASE_TAG" --notes-file release/notes.md --draft=false
+          gh release view "$RELEASE_TAG" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"

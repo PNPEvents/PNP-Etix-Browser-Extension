@@ -1,0 +1,18 @@
+{
+  "name": "etix-support-assistant-extension",
+  "version": "0.9.28",
+  "private": true,
+  "description": "A safe, configurable Chrome, Edge and Firefox extension for Etix support workflows.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node scripts/check-extension.js",
+    "check:public": "node scripts/check-public-files.js",
+    "scan:secrets": "bash scripts/scan-secrets.sh git",
+    "setup:hooks": "git config core.hooksPath .githooks",
+    "package": "node scripts/package-extension.js",
+    "package:firefox": "node scripts/package-extension.js firefox"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

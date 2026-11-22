@@ -1,0 +1,9 @@
+# Door-access request column
+
+The Unassigned Seat page's native row model includes `orderLevelMiscInfos`, an array of `{name, response, image, imageUrl}` records. The precise door-access question and its answer are HTML strings, such as `<div>Yes</div>`. The added icon is derived only from an explicit Yes to the matching question. Other questions, ticket-level answers and absent responses never produce an icon. HTML tags, common/numeric entities, punctuation, case and whitespace are normalised without inserting response HTML into the page.
+
+`access-request.js` owns the independent `enhancements.doorAccessColumn` setting (off by default). Its acknowledged configuration bridge handles either content-script initialisation order. Only configuration booleans and request IDs cross the bridge; answers and customer records are not copied to storage or logs.
+
+`access-request-main.js` reads the existing MUI API context and adds a 56px display column after `customerName`. Its header and affirmative values use a monochrome wheelchair symbol. Native value getters support both old and new MUI signatures. Sorting, filtering, editing, menus and export are disabled for this derived column. Existing column definitions, filters, pagination, row models and native renderers are retained. A column-change subscription and mount recovery reinstall it when Etix refreshes the grid. Switching off hides only this column and stops its observer and timers. The value getter returns blank while disabled.
+
+Header descriptions explain that the symbol means a request to sit closer to the doors; it does not identify a particular disability. Cell titles and accessible labels are refreshed as virtualised rows are recycled. Tests cover exact question/answer matching, HTML responses, all-page data, missing/unrelated answers, native column refreshes, independent settings, disabling/re-enabling and configuration ordering.
