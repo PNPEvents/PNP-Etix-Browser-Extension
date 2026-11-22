@@ -7,9 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing version tag to release (for example v0.9.28)
+        description: Version tag to release (for example v0.9.28)
         required: true
         type: string
+      create_tag:
+        description: Create a new tag at the selected branch commit (fails if tag exists)
+        type: boolean
+        default: false
+      require_firefox_signing:
+        description: Stop rather than publish an unsigned Firefox build
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,10 +39,10 @@ jobs:
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
-      - name: Check out the version tag
+      - name: Check out the release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          ref: ${{ inputs.create_tag && github.sha || format('refs/tags/{0}', inputs.tag || github.ref_name) }}
           persist-credentials: false
           fetch-depth: 0
 
@@ -78,6 +86,16 @@ jobs:
           npm run package
           npm run package:firefox
 
+      - name: Create the requested version tag
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.create_tag }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Create only after validation/tests. Never move or overwrite a tag.
+          gh api --method POST "repos/$GH_REPO/git/refs" \
+            -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$(git rev-parse HEAD)"
+
       - name: Prepare release assets
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -115,6 +133,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           VERSION: ${{ steps.version.outputs.version }}
+          REQUIRE_FIREFOX_SIGNING: ${{ inputs.require_firefox_signing || false }}
         run: |
           signed_name="etix-support-assistant-${VERSION}-firefox.xpi"
           # Reuse an installer saved to the draft by an earlier run. Mozilla does
@@ -124,6 +143,10 @@ jobs:
             gh release download "$RELEASE_TAG" --pattern "$signed_name" --dir release/github
             echo 'signed=true' >> "$GITHUB_OUTPUT"
           elif [ -z "$WEB_EXT_API_KEY" ] && [ -z "$WEB_EXT_API_SECRET" ]; then
+            if [ "$REQUIRE_FIREFOX_SIGNING" = true ]; then
+              echo '::error::Firefox signing is required. Configure both Mozilla Actions secrets.'
+              exit 1
+            fi
             echo '::warning::Mozilla secrets are absent. Firefox ZIP supports temporary installation only.'
             echo 'signed=false' >> "$GITHUB_OUTPUT"
           else

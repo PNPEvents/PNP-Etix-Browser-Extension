@@ -24,7 +24,9 @@ git push origin v0.9.28
 
 For later releases, first increase `version` in both `manifest.json` and `package.json`, commit and push those changes, then tag that commit with the matching version. Do not reuse a tag for different code. Let the workflow create and publish the GitHub Release; do not manually publish it first, because the workflow refuses to replace published releases.
 
-The workflow also has **Actions → Build and publish extensions → Run workflow** with an existing tag input. The workflow must be present on the default branch for this button, and the tagged commit must contain all build/security scripts. It always checks out the requested tag, never the selected branch's current code. A published release is not overwritten; publish a new version instead.
+The workflow also has **Actions → Build and publish extensions → Run workflow** with a version tag input. Normally it checks out an existing tag. For the first release, select `main`, enter `v0.9.28`, and enable **Create a new tag at the selected branch commit**. This builds the exact selected commit, then creates the tag only after the security checks, tests and builds pass. Tag creation fails if the tag already exists; rerun with this option off to use an existing tag. No tag is ever moved or overwritten.
+
+Enable **Stop rather than publish an unsigned Firefox build** when a permanent Firefox installer is required. Missing Mozilla credentials will then fail the release rather than publish only the unsigned ZIP. The workflow must be present on the default branch for the Run workflow button. A published release is not overwritten; publish a new version instead.
 
 If the repository restricts Actions, allow the official `actions/checkout` and `actions/setup-node` actions and `contents: write` for the release job. Their commit SHAs are pinned. The normal secret-scan workflow has read-only permissions. Release publishing uses GitHub's built-in token; no personal access token is needed.
 
